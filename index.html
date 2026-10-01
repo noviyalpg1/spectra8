@@ -867,7 +867,7 @@
             } catch(e) { return {}; }
         }
 
-        function markExamCompleted(name, stdClass, examUrl) {
+        function markExamCompleted(name, stdClass, examUrl, triggerSync = false) {
             const db = getCompletedExamsDB();
             const studentKey = `${name}_${stdClass || ''}`.toLowerCase().trim();
             
@@ -878,7 +878,9 @@
                 db[studentKey].push(examUrl);
             }
             localStorage.setItem(COMPLETED_EXAMS_DB_KEY, JSON.stringify(db));
-            syncToBackend(['students', 'completedExams']); // Tersegmentasi: Sync log dan riwayat selesai
+            if (triggerSync) {
+                syncToBackend(['completedExams']);
+            }
         }
 
         // Cek riwayat selesai ujian
@@ -1032,6 +1034,11 @@
         // Pengganti syncToBackend yang kini terhubung langsung ke Outbox Queue
         function syncToBackend(components = ['students']) {
             enqueueSync(components);
+        }
+
+        async function syncToBackendNow(components = ['students']) {
+            enqueueSync(components);
+            return await processSyncQueue();
         }
 
         // --- FUNGSI NAVIGASI VIEW TAMPILAN ---
@@ -1268,232 +1275,6 @@
             if (teacherPollTimer) {
                 clearInterval(teacherPollTimer);
                 teacherPollTimer = null;
-            }
-        }
-
-        async function syncToBackend(components = ['students']) {
-            updateCloudUIStatus('syncing');
-            try {
-                const dataPayload = {};
-                if (components.includes('students')) dataPayload.students = getDB();
-                if (components.includes('subjects')) dataPayload.subjects = getSubjectsDB();
-                if (components.includes('completedExams')) dataPayload.completedExams = getCompletedExamsDB();
-                if (components.includes('registeredStudents')) dataPayload.registeredStudents = getRegisteredStudentsDB();
-
-                const payload = {
-                    action: 'setDatabase',
-                    data: dataPayload
-                };
-
-                // Menggunakan keepalive: true agar pengiriman saat minimize/tutup tab tetap terkirim ke server
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(payload),
-                    keepalive: true
-                });
-                
-                const text = await response.text();
-                if (text.includes("success") || response.ok) {
-                    updateCloudUIStatus('success');
-                } else {
-                    updateCloudUIStatus('error');
-                }
-            } catch(e) { 
-                console.log("Silent sync failed", e); 
-                updateCloudUIStatus('error');
-            }
-        }
-
-        async function fetchFromBackend() {
-            if (isFetching) return;
-            isFetching = true;
-            try {
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'getDatabase' })
-                });
-                
-                const responseText = await response.text();
-                
-                if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html") || responseText.trim().startsWith("<script")) {
-                    console.warn("GAS mendeteksi HTML respons dari server. Membutuhkan otorisasi ulang.");
-                    updateCloudUIStatus('error');
-                    return; 
-                }
-
-                const result = JSON.parse(responseText);
-                if (result.status === 'success' && result.data) {
-                    let updatedDB = false;
-                    let updatedSubj = false;
-                    let updatedComp = false;
-                    let updatedReg = false;
-
-                    const oldDB = localStorage.getItem(DB_KEY);
-                    const oldSubj = localStorage.getItem(SUBJECTS_DB_KEY);
-                    const oldComp = localStorage.getItem(COMPLETED_EXAMS_DB_KEY);
-                    const oldReg = localStorage.getItem(REGISTERED_STUDENTS_DB_KEY);
-
-                    // UPDATE DATABASE SISWA DENGAN PROTEKSI DATA MANDIRI (Mencegah Race Condition)
-                    if(result.data.students && typeof result.data.students === 'object') {
-                        const cloudStudents = result.data.students;
-                        const localDB = getDB();
-                        
-                        // Jika ini adalah browser siswa, lindungi data diri sendiri dari overwriting data usang cloud
-                        if (currentStudentId && localDB[currentStudentId]) {
-                            const localSelf = localDB[currentStudentId];
-                            const cloudSelf = cloudStudents[currentStudentId];
-                            
-                            if (cloudSelf) {
-                                // Jika status di cloud adalah instruksi penguncian/force submit dari pengawas, terima!
-                                if (cloudSelf.status === 'Dikunci (Force)' || cloudSelf.status === 'Dikunci') {
-                                    localSelf.status = cloudSelf.status;
-                                    localDB[currentStudentId].status = cloudSelf.status;
-                                    localStorage.setItem(DB_KEY, JSON.stringify(localDB));
-                                } else {
-                                    // Selain instruksi blokir pengawas, amankan data lokal (Sisa waktu & Status aktif) agar tidak ditimpa usang
-                                    cloudStudents[currentStudentId] = localSelf;
-                                }
-                            }
-                        }
-
-                        const newDBStr = JSON.stringify(cloudStudents);
-                        if (newDBStr !== oldDB) {
-                            localStorage.setItem(DB_KEY, newDBStr);
-                            updatedDB = true;
-                        }
-                    }
-                    if(result.data.subjects && typeof result.data.subjects === 'object') {
-                        // Normalisasi subjek dari cloud agar selalu tervalidasi per tingkat kelas
-                        let rawCloudSubjects = result.data.subjects;
-                        let normalizedCloud = {};
-                        for (let k in rawCloudSubjects) {
-                            let item = rawCloudSubjects[k];
-                            if (typeof item === 'object') {
-                                // MENDETEKSI MULTI-ALIAS DARI BACKEND (Sistem Aman Lintas Kolom)
-                                let gTarget = item.grade || item.Grade || item.Tingkat || item.tingkat || item.Kelas || item.kelas || item.gradeTarget || "7";
-                                let sName = item.subjectName || k.split('_')[0] || k;
-                                normalizedCloud[`${sName}_${gTarget}`] = {
-                                    url: item.url || "",
-                                    active: !!item.active,
-                                    duration: parseInt(item.duration) || 90,
-                                    grade: String(gTarget),
-                                    Grade: String(gTarget),
-                                    Tingkat: String(gTarget),
-                                    tingkat: String(gTarget),
-                                    Kelas: String(gTarget),
-                                    kelas: String(gTarget),
-                                    gradeTarget: String(gTarget),
-                                    subjectName: sName
-                                };
-                            }
-                        }
-                        const newSubjStr = JSON.stringify(normalizedCloud);
-                        if (newSubjStr !== oldSubj) {
-                            localStorage.setItem(SUBJECTS_DB_KEY, newSubjStr);
-                            updatedSubj = true;
-                        }
-                    }
-                    if(result.data.completedExams && typeof result.data.completedExams === 'object') {
-                        const newCompStr = JSON.stringify(result.data.completedExams);
-                        if (newCompStr !== oldComp) {
-                            localStorage.setItem(COMPLETED_EXAMS_DB_KEY, newCompStr);
-                            updatedComp = true;
-                        }
-                    }
-
-                    // SINKRONISASI & NORMALISASI DATA REGISTRASI (Mendukung Data_Registrasi / registeredStudents)
-                    let regData = result.data.Data_Registrasi || result.data.data_registrasi || result.data.registeredStudents;
-                    if (regData) {
-                        if (typeof regData === 'object' && !Array.isArray(regData)) {
-                            regData = Object.values(regData); 
-                        }
-                        if (Array.isArray(regData)) {
-                            const normalizedRegData = regData.map(s => {
-                                if (!s) return null;
-                                const name = s["Nama Siswa"] || s.name || s.Nama || s.nama || s.nama_siswa || "";
-                                const cls = s["Kelas"] || s.class || s.Kelas || s.kelas || "";
-                                return {
-                                    name: String(name).trim(),
-                                    class: String(cls).trim()
-                                };
-                            }).filter(s => s && s.name !== "");
-
-                            const newRegStr = JSON.stringify(normalizedRegData);
-                            if (newRegStr !== oldReg) {
-                                localStorage.setItem(REGISTERED_STUDENTS_DB_KEY, newRegStr);
-                                updatedReg = true;
-                            }
-                        }
-                    }
-
-                    const anyUpdated = updatedDB || updatedSubj || updatedComp || updatedReg;
-
-                    if (anyUpdated) {
-                        window.dispatchEvent(new Event('storage'));
-                    }
-                    
-                    updateCloudUIStatus('success');
-
-                    // Cegah pembaruan DOM selagi pengguna/siswa sedang berinteraksi memilih dropdown
-                    const activeEl = document.activeElement;
-                    const isUserInteracting = activeEl && 
-                        ['student-class', 'student-name', 'student-subject-select'].includes(activeEl.id);
-
-                    if (!document.getElementById('view-student-login').classList.contains('hidden')) {
-                        if (!isUserInteracting) {
-                            const currentClass = document.getElementById('student-class').value;
-                            const currentName = document.getElementById('student-name').value;
-                            const currentSubject = document.getElementById('student-subject-select').value;
-                            
-                            if (updatedReg) {
-                                loadLoginClasses();
-                                if (currentClass) {
-                                    document.getElementById('student-class').value = currentClass;
-                                    populateLoginNames();
-                                    if (currentName) {
-                                        document.getElementById('student-name').value = currentName;
-                                    }
-                                }
-                            }
-                            
-                            if (updatedSubj) {
-                                loadActiveSubjectsForStudent();
-                                if (currentSubject) {
-                                    document.getElementById('student-subject-select').value = currentSubject;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (!document.getElementById('view-teacher').classList.contains('hidden')) {
-                        if (updatedReg) renderRegisteredStudents();
-                        renderTeacherDashboard(); // Selalu segarkan list live monitoring aktivitas ujian
-                    }
-
-                    // --- PROTEKSI FORCE SUBMIT VIA BACKEND SINKRONISASI ---
-                    if (isExamActive && currentStudentId) {
-                        const currentRecord = result.data.students ? result.data.students[currentStudentId] : null;
-                        if (currentRecord && (currentRecord.status === 'Dikunci (Force)' || currentRecord.status === 'Dikunci')) {
-                            isExamActive = false;
-                            clearInterval(timerInterval);
-                            removeAntiCheat();
-                            
-                            exitFullScreenSafe();
-
-                            document.getElementById('locked-overlay').classList.remove('hidden');
-                            document.getElementById('locked-overlay').classList.add('flex');
-                        }
-                    }
-                } else {
-                     updateCloudUIStatus('error');
-                }
-            } catch(e) {
-                console.warn("Gagal sinkronisasi dari server karena jaringan (Failed to fetch). Fallback lokal.");
-                updateCloudUIStatus('error');
-            } finally {
-                isFetching = false;
             }
         }
 
@@ -2460,40 +2241,66 @@
         }
 
         // Auto submit saat waktu pengerjaan habis
-        function autoSubmitOnTimeout() {
+        async function autoSubmitOnTimeout() {
             isExamActive = false;
             removeAntiCheat();
             
-            if (currentExamUrl) {
-                markExamCompleted(currentStudentName, currentStudentClass, currentExamUrl);
+            const finishedStudentId = currentStudentId;
+            const finishedStudentName = currentStudentName;
+            const finishedStudentClass = currentStudentClass;
+            const finishedExamUrl = currentExamUrl;
+            const finishedSubject = currentSubjectName;
+
+            exitFullScreenSafe();
+
+            // 1. Simpan status 'Selesai' di database lokal
+            updateStudentStatus(finishedStudentId, finishedStudentName, finishedStudentClass, 'Selesai', violations, "Ujian selesai otomatis (Waktu Habis).", finishedExamUrl, finishedSubject, 0, 0);
+
+            // 2. Tandai pengerjaan selesai di riwayat
+            if (finishedExamUrl) {
+                markExamCompleted(finishedStudentName, finishedStudentClass, finishedExamUrl, false);
             }
             
-            exitFullScreenSafe();
-            
-            // SINKRONISASI EVENT 4: "Selesai" jika waktu habis
-            updateStudentStatus(currentStudentId, currentStudentName, currentStudentClass, 'Selesai', violations, "Ujian selesai otomatis (Waktu Habis).", currentExamUrl);
-            
-            showCustomAlert("Waktu Habis!", "Waktu pengerjaan untuk mata pelajaran ini telah habis.\nJawaban Anda telah tersubmit secara otomatis.", "success", () => {
+            // 3. Kirim paket selesai ke backend segera
+            await syncToBackendNow(['students', 'completedExams']);
+            currentStudentId = null;
+
+            showCustomAlert("Waktu Habis!", "Waktu pengerjaan untuk mata pelajaran ini telah habis.\nJawaban Anda telah tersubmit secara otomatis dan status tercatat Selesai.", "success", () => {
                 switchView('view-role');
             });
         }
 
         function submitExam() {
-            showCustomConfirm("Selesai Ujian", "Apakah Anda yakin ingin menyelesaikan ujian?", () => {
+            showCustomConfirm("Selesai Ujian", "Apakah Anda yakin ingin menyelesaikan ujian?", async () => {
                 isExamActive = false;
                 clearInterval(timerInterval);
                 removeAntiCheat();
                 
-                if (currentExamUrl) {
-                    markExamCompleted(currentStudentName, currentStudentClass, currentExamUrl);
-                }
-                
                 exitFullScreenSafe();
+
+                const finishedStudentId = currentStudentId;
+                const finishedStudentName = currentStudentName;
+                const finishedStudentClass = currentStudentClass;
+                const finishedExamUrl = currentExamUrl;
+                const finishedSubject = currentSubjectName;
+
+                // 1. Simpan status 'Selesai' di database lokal terlebih dahulu
+                updateStudentStatus(finishedStudentId, finishedStudentName, finishedStudentClass, 'Selesai', violations, "Siswa menyelesaikan ujian secara mandiri.", finishedExamUrl, finishedSubject, 0, 0);
+
+                // 2. Tandai pengerjaan selesai di riwayat
+                if (finishedExamUrl) {
+                    markExamCompleted(finishedStudentName, finishedStudentClass, finishedExamUrl, false);
+                }
+
+                // 3. Kirim data Selesai ke server GAS secara tuntas dan prioritas tinggi
+                await syncToBackendNow(['students', 'completedExams']);
                 
-                // SINKRONISASI EVENT 5: "Selesai" seketika saat mengklik selesai mandiri
-                updateStudentStatus(currentStudentId, currentStudentName, currentStudentClass, 'Selesai', violations, "Siswa menyelesaikan ujian secara mandiri.", currentExamUrl);
-                showCustomAlert("Berhasil", "Ujian berhasil disubmit dan data pengerjaan telah dikirim.", "success");
-                switchView('view-role');
+                // 4. Bersihkan ID sesi aktif pada perangkat siswa
+                currentStudentId = null;
+                
+                showCustomAlert("Berhasil", "Ujian berhasil diselesaikan dan status Anda telah tercatat SELESAI di sistem pengawas.", "success", () => {
+                    switchView('view-role');
+                });
             });
         }
 
@@ -2693,7 +2500,9 @@
             const finalPendingUntil = status === 'Pending' ? (pendingUntil || (db[id] ? db[id].pendingUntil : 0)) : 0;
             
             let finalRemainingTime = null;
-            if (customRemainingTime !== null && customRemainingTime > 0) {
+            if (status === 'Selesai' || status.includes('Dikunci')) {
+                finalRemainingTime = 0;
+            } else if (customRemainingTime !== null && customRemainingTime > 0) {
                 finalRemainingTime = customRemainingTime;
             } else if (isExamActive && examTimer > 0) {
                 finalRemainingTime = examTimer;
@@ -2768,7 +2577,7 @@
                 if (std.status === 'Menunggu' || std.status === 'Siap Ujian') countWaiting++;
                 else if (std.status === 'Sedang Ujian') countOnline++;
                 else if (std.status === 'Pending' || std.status === 'Melanggar') countPending++;
-                else if (std.status === 'Selesai' || std.status.includes('Dikunci') || std.status.includes('Waktu Habis')) countCompleted++;
+                else if (std.status === 'Selesai' || std.status.includes('Selesai') || std.status.includes('Dikunci') || std.status.includes('Waktu Habis')) countCompleted++;
             });
 
             const elWaiting = document.getElementById('dash-waiting');
@@ -2852,11 +2661,11 @@
                     </td>
                     <td class="p-4 text-right">
                         <div class="flex flex-col items-end gap-1.5">
-                            ${(std.status !== 'Dikunci' && std.status !== 'Selesai' && std.status !== 'Dikunci (Force)') ? 
+                            ${(!std.status.includes('Dikunci') && !std.status.includes('Selesai')) ? 
                               `<button onclick="forceSubmitStudent('${std.id}')" class="text-xs bg-slate-800 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition shadow-sm w-full text-center font-semibold">
                                   Force Submit
                                 </button>` : 
-                              `<span class="text-xs text-slate-400 italic">Selesai</span>`}
+                              `<span class="text-xs text-emerald-600 font-semibold italic"><i class="fas fa-check text-[10px] mr-1"></i>Selesai</span>`}
                             <button onclick="resetStudentData('${std.id}')" class="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg transition shadow-sm w-full text-center font-semibold">
                                 <i class="fas fa-undo"></i> Reset Akses
                             </button>
