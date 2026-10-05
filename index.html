@@ -2027,9 +2027,13 @@
         }
 
         function prepareExamSession(examUrl, subjectName) {
+            currentExamUrl = examUrl;
+            currentSubjectName = subjectName || "Mapel QR Code";
+
+            // Cek apakah siswa sebelumnya sudah pernah submit atau terkunci
             if (hasCompletedExam(currentStudentName, currentStudentClass, examUrl)) {
-                showCustomAlert("Akses Ditolak", "Anda Telah Mengerjakan Soal (Ujian Selesai/Dikunci).", "error");
                 stopScannerAndGoBack();
+                showBlockedWithUnlockOption(`Siswa <b class="text-white">${currentStudentName} (${currentStudentClass})</b> terdata sudah menyelesaikan ujian mapel ini sebelumnya.`, examUrl, subjectName);
                 return;
             }
 
@@ -2040,15 +2044,15 @@
                     const now = Date.now();
                     if (existingRecord.pendingUntil && now < existingRecord.pendingUntil) {
                         const remainingSec = Math.ceil((existingRecord.pendingUntil - now) / 1000);
-                        showCustomAlert("Pending", `Status Anda PENDING karena pelanggaran keluar dari ujian.\n\nTunggu ${remainingSec} detik lagi untuk bisa masuk kembali.`, "error");
                         stopScannerAndGoBack();
+                        showBlockedWithUnlockOption(`Status siswa PENDING karena keluar dari aplikasi ujian.<br>Tersisa sanksi waktu tunggu <b>${remainingSec} detik</b>.`, examUrl, subjectName);
                         return;
                     }
                 }
                 
-                if (existingRecord.status.includes('Dikunci')) {
-                    showCustomAlert("Akses Ditolak", "Anda sudah dikunci dari sistem karena melakukan pelanggaran fatal.", "error");
+                if (existingRecord.status && existingRecord.status.includes('Dikunci')) {
                     stopScannerAndGoBack();
+                    showBlockedWithUnlockOption(`Siswa <b class="text-white">${currentStudentName}</b> terkunci otomatis oleh sistem karena mencapai batas maksimal pelanggaran (3 kali).`, examUrl, subjectName);
                     return;
                 }
 
@@ -2056,8 +2060,6 @@
                 violations = existingRecord.violations || 0;
                 examTimer = existingRecord.remainingTime || 0;
             } else {
-                // PEMBARUAN PENCEGAHAN BENTROK ID:
-                // Menggunakan ID unik berbasis inisial nama, kelas, dan milidetik waktu saat ini.
                 const nameClean = currentStudentName.replace(/\s+/g, '').substring(0, 3).toUpperCase();
                 const classClean = currentStudentClass.replace(/\s+/g, '').toUpperCase();
                 currentStudentId = `STD-${nameClean}-${classClean}-${Date.now().toString().slice(-4)}`;
@@ -2065,14 +2067,19 @@
                 examTimer = 0;
             }
 
+            proceedToExamSession(examUrl, subjectName);
+        }
+
+        function proceedToExamSession(examUrl, subjectName) {
             currentExamUrl = examUrl;
             currentSubjectName = subjectName || "Mapel QR Code";
+
             triggerFullscreen();
 
             document.getElementById('display-student-name').innerText = `${currentStudentName} (${currentStudentClass})`;
             document.getElementById('exam-iframe').src = examUrl;
             
-            // SINKRONISASI EVENT 1: "Menunggu" saat login berhasil masuk ruang tunggu
+            // Simpan status awal siswa
             updateStudentStatus(currentStudentId, currentStudentName, currentStudentClass, 'Menunggu', violations, "Memasuki ruang ujian (Cek Sistem)...", currentExamUrl, currentSubjectName, 0, examTimer);
             
             switchView('view-system-check');
