@@ -1251,20 +1251,111 @@
             const localRekap = getRekapCompletedDB();
             
             // Cek agar tidak terjadi duplikasi entri
-            const isExist = localRekap.some(r => r.name.toLowerCase() === record.name.toLowerCase() && 
+            const existIdx = localRekap.findIndex(r => r.name.toLowerCase() === record.name.toLowerCase() && 
                                                  String(r.class || '').toLowerCase() === String(record.class || '').toLowerCase() && 
                                                  r.subject === record.subject);
-            if (!isExist) {
+            if (existIdx >= 0) {
+                localRekap[existIdx] = record;
+            } else {
                 localRekap.unshift(record);
-                saveRekapCompletedDB(localRekap);
             }
+            saveRekapCompletedDB(localRekap);
 
-            // 2. Masukkan ke Outbox Queue untuk ditransmisikan 1x ke server Google Apps Script
+            // 2. Perbarui juga data di active students DB
+            const db = getDB();
+            for (let id in db) {
+                if (db[id].name.toLowerCase() === record.name.toLowerCase() && 
+                    String(db[id].class || '').toLowerCase() === String(record.class || '').toLowerCase()) {
+                    db[id].status = record.status;
+                    db[id].submitTime = record.submitTime;
+                    db[id].violations = record.violations;
+                }
+            }
+            saveDB(db);
+
+            // 3. Masukkan ke Outbox Queue untuk ditransmisikan 1x ke server Google Apps Script
             enqueueSync(['rekapCompleted'], {
                 action: 'submitFinalExam',
                 studentExamRecord: record,
                 rekapCompleted: localRekap
             });
+        }
+
+        // =========================================================================
+        // --- PENDATAAN SISWA MASUK (SEDANG UJIAN) & AGREGASI MONITORING ---
+        // =========================================================================
+        function recordStudentLogin(name, stdClass, subject, examUrl) {
+            if (!name) return;
+            const now = new Date();
+            const loginTimeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+            
+            const db = getDB();
+            const studentId = currentStudentId || `STD-${name.replace(/\s+/g, '').substring(0, 3).toUpperCase()}-${(stdClass || '').replace(/\s+/g, '').toUpperCase()}-${Date.now().toString().slice(-4)}`;
+            
+            db[studentId] = {
+                id: studentId,
+                name: name,
+                class: stdClass || '-',
+                subject: subject || 'Ujian Digital',
+                examUrl: examUrl || '',
+                status: 'Sedang Ujian',
+                violations: violations || 0,
+                loginTime: loginTimeStr,
+                lastLog: loginTimeStr,
+                timestamp: Date.now()
+            };
+            saveDB(db);
+
+            // Kirim 1x paket pendaftaran login ke backend tanpa polling detik
+            enqueueSync(['students'], {
+                action: 'studentLogin',
+                student: db[studentId]
+            });
+        }
+
+        function getAllMonitoringRecords() {
+            const rekap = getRekapCompletedDB(); // Rekapan siswa yang selesai
+            const activeDB = getDB(); // Sesi siswa yang sedang aktif/login
+            
+            const recordMap = new Map();
+
+            // 1. Masukkan data siswa aktif (status Sedang Ujian, Menunggu, Pending)
+            Object.values(activeDB).forEach(item => {
+                if (!item || !item.name) return;
+                const key = `${item.name}_${item.class || ''}_${item.subject || ''}`.toLowerCase().trim();
+                recordMap.set(key, {
+                    id: item.id,
+                    name: item.name,
+                    class: item.class || '-',
+                    subject: item.subject || '-',
+                    status: item.status || 'Sedang Ujian',
+                    violations: item.violations || 0,
+                    loginTime: item.loginTime || item.lastLog || (new Date(item.timestamp || Date.now()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'),
+                    submitTime: item.submitTime || '-',
+                    timestamp: item.timestamp || Date.now()
+                });
+            });
+
+            // 2. Gabungkan data selesai (status Selesai mengambil prioritas)
+            rekap.forEach(item => {
+                if (!item || !item.name) return;
+                const key = `${item.name}_${item.class || ''}_${item.subject || ''}`.toLowerCase().trim();
+                const existing = recordMap.get(key);
+                recordMap.set(key, {
+                    id: item.id || (existing ? existing.id : null),
+                    name: item.name,
+                    class: item.class || (existing ? existing.class : '-'),
+                    subject: item.subject || (existing ? existing.subject : '-'),
+                    status: item.status || 'Selesai',
+                    violations: item.violations !== undefined ? item.violations : (existing ? existing.violations : 0),
+                    loginTime: (existing && existing.loginTime) ? existing.loginTime : (item.loginTime || '-'),
+                    submitTime: item.submitTime || '-',
+                    timestamp: item.timestamp || Date.now()
+                });
+            });
+
+            // Urutkan berdasarkan waktu terbaru
+            return Array.from(recordMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         }
 
         function showCustomAlert(title, message, type = "info", callback = null) {
@@ -1365,23 +1456,28 @@
         }
 
         function renderMonitoringTable() {
-            const records = getRekapCompletedDB();
+            const records = getAllMonitoringRecords();
             const tbody = document.getElementById('student-table-body');
 
-            const countLoginEl = document.getElementById('dash-total-login');
+            const waitingEl = document.getElementById('dash-waiting');
             const onlineEl = document.getElementById('dash-online');
+            const pendingEl = document.getElementById('dash-pending');
             const completedEl = document.getElementById('dash-completed');
+            const countLoginEl = document.getElementById('dash-total-login');
             const violEl = document.getElementById('dash-violations');
 
             // Hitung statistik
-            const totalLogin = records.length;
+            const totalWaiting = records.filter(r => r && r.status === 'Menunggu').length;
             const totalOnline = records.filter(r => r && r.status === 'Sedang Ujian').length;
+            const totalPending = records.filter(r => r && r.status === 'Pending').length;
             const totalCompleted = records.filter(r => r && r.status && r.status.includes('Selesai')).length;
             const totalViolations = records.reduce((acc, r) => acc + (parseInt(r.violations) || 0), 0);
 
-            if (countLoginEl) countLoginEl.innerText = totalLogin;
+            if (waitingEl) waitingEl.innerText = totalWaiting;
             if (onlineEl) onlineEl.innerText = totalOnline;
+            if (pendingEl) pendingEl.innerText = totalPending;
             if (completedEl) completedEl.innerText = totalCompleted;
+            if (countLoginEl) countLoginEl.innerText = records.length;
             if (violEl) violEl.innerText = totalViolations;
 
             if (!tbody) return;
@@ -2402,6 +2498,9 @@
             startTimer(durationInSeconds);
             setupAntiCheat();
             
+            // Catat login siswa secara instan agar langsung muncul di tabel Monitoring Peserta
+            recordStudentLogin(currentStudentName, currentStudentClass, currentSubjectName, currentExamUrl);
+
             // SINKRONISASI EVENT 3: "Sedang Ujian" seketika saat masuk pengerjaan
             updateStudentStatus(currentStudentId, currentStudentName, currentStudentClass, 'Sedang Ujian', violations, "Siswa masuk dan mulai mengerjakan ujian.", currentExamUrl, currentSubjectName, 0, durationInSeconds);
         }
@@ -2812,8 +2911,24 @@
                 if (res && res.data) {
                     if (res.data.rekapCompleted && Array.isArray(res.data.rekapCompleted)) {
                         saveRekapCompletedDB(res.data.rekapCompleted);
+                    } else if (res.data.students) {
+                        const stds = Array.isArray(res.data.students) ? res.data.students : Object.values(res.data.students);
+                        if (stds.length > 0) saveRekapCompletedDB(stds);
+                    }
+                    if (res.data.activeStudents || res.data.students) {
+                        const activeStds = res.data.activeStudents || res.data.students;
+                        if (typeof activeStds === 'object') {
+                            const db = getDB();
+                            if (Array.isArray(activeStds)) {
+                                activeStds.forEach(s => { if (s && s.id) db[s.id] = s; });
+                            } else {
+                                Object.assign(db, activeStds);
+                            }
+                            localStorage.setItem(DB_KEY, JSON.stringify(db));
+                        }
                     }
                     updateCloudUIStatus('success');
+                    renderMonitoringTable();
                 }
             } catch (e) {
                 console.warn("Gagal memuat data monitoring dari cloud:", e.message);
@@ -2869,7 +2984,7 @@
         }
 
         function downloadRekapCSV() {
-            const records = getRekapCompletedDB();
+            const records = getAllMonitoringRecords();
             if (records.length === 0) {
                 showCustomAlert("Informasi", "Belum ada rekapan pengerjaan untuk diunduh.", "info");
                 return;
