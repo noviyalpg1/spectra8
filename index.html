@@ -1025,17 +1025,28 @@
                     Object.assign(dataPayload, currentTask.payload);
                 }
 
+                // Payload lengkap agar dapat diterima oleh GAS baik mode Properties maupun mode Sheet Baris
+                const requestPayload = {
+                    action: currentTask.payload && currentTask.payload.action ? currentTask.payload.action : 'setDatabase',
+                    subAction: currentTask.payload && currentTask.payload.action ? currentTask.payload.action : 'sync',
+                    student: currentTask.payload && currentTask.payload.student ? currentTask.payload.student : null,
+                    completedRecord: currentTask.payload && currentTask.payload.completedRecord ? currentTask.payload.completedRecord : null,
+                    name: currentTask.payload && currentTask.payload.student ? currentTask.payload.student.name : (currentTask.payload && currentTask.payload.completedRecord ? currentTask.payload.completedRecord.name : ''),
+                    class: currentTask.payload && currentTask.payload.student ? currentTask.payload.student.class : (currentTask.payload && currentTask.payload.completedRecord ? currentTask.payload.completedRecord.class : ''),
+                    subject: currentTask.payload && currentTask.payload.student ? currentTask.payload.student.subject : (currentTask.payload && currentTask.payload.completedRecord ? currentTask.payload.completedRecord.subject : ''),
+                    status: currentTask.payload && currentTask.payload.student ? currentTask.payload.student.status : (currentTask.payload && currentTask.payload.completedRecord ? currentTask.payload.completedRecord.status : ''),
+                    violations: currentTask.payload && currentTask.payload.completedRecord ? currentTask.payload.completedRecord.violations : 0,
+                    time: currentTask.payload && currentTask.payload.student ? currentTask.payload.student.loginTime : (currentTask.payload && currentTask.payload.completedRecord ? currentTask.payload.completedRecord.submitTime : ''),
+                    data: dataPayload
+                };
+
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 12000);
 
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
-                        action: 'setDatabase',
-                        subAction: currentTask.payload && currentTask.payload.action ? currentTask.payload.action : 'sync',
-                        data: dataPayload
-                    }),
+                    body: JSON.stringify(requestPayload),
                     signal: controller.signal
                 });
 
@@ -1089,6 +1100,14 @@
                 const res = safeJsonParse(rawText, null);
 
                 if (res && res.data) {
+                    // Simpan data siswa aktif yang sedang ujian dari backend
+                    if (res.data.students && typeof res.data.students === 'object') {
+                        saveDB(res.data.students);
+                    }
+                    // Simpan rekapan yang sudah selesai
+                    if (res.data.rekapCompleted && Array.isArray(res.data.rekapCompleted)) {
+                        saveRekapCompletedDB(res.data.rekapCompleted);
+                    }
                     if (res.data.subjects && typeof res.data.subjects === 'object') {
                         localStorage.setItem(SUBJECTS_DB_KEY, JSON.stringify(res.data.subjects));
                     }
@@ -1096,9 +1115,7 @@
                         localStorage.setItem(REGISTERED_STUDENTS_DB_KEY, JSON.stringify(res.data.registeredStudents));
                         renderRegisteredStudents();
                     }
-                    if (res.data.rekapCompleted && Array.isArray(res.data.rekapCompleted)) {
-                        saveRekapCompletedDB(res.data.rekapCompleted);
-                    }
+                    renderMonitoringTable();
                     updateCloudUIStatus('success');
                 }
             } catch (err) {
