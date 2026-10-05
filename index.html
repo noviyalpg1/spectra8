@@ -198,6 +198,104 @@
         </div>
     </div>
 
+    <!-- CUSTOM MODAL: BUKA KUNCI SISWA (DARI DASBOR PENGAWAS) -->
+    <div id="dashboard-unlock-modal" class="fixed inset-0 z-[1050] hidden flex-col items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl max-w-md w-full p-6 text-center transform transition-transform duration-300 scale-95" id="dashboard-unlock-box">
+            <div class="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-amber-500/20">
+                <i class="fas fa-unlock-alt"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-1">Buka Kunci Akses Siswa</h3>
+            <p class="text-slate-400 mb-5 text-xs leading-relaxed">Pilih siswa yang mengalami kendala akses ditolak atau terkunci untuk mereset sesi dan mengizinkannya masuk kembali.</p>
+            
+            <div class="space-y-4 mb-6 text-left">
+                <div>
+                    <label class="text-xs text-slate-400 font-bold uppercase mb-1 block">Kelas / Rombel</label>
+                    <select id="dash-unlock-class" onchange="populateDashboardUnlockNames()" class="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-700 focus:border-amber-500 outline-none text-sm cursor-pointer">
+                        <option value="">-- Pilih Kelas --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 font-bold uppercase mb-1 block">Nama Siswa</label>
+                    <select id="dash-unlock-name" disabled class="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-700 focus:border-amber-500 outline-none text-sm cursor-pointer disabled:opacity-50">
+                        <option value="">-- Pilih Nama Siswa --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex gap-3 justify-center">
+                <button onclick="hideDashboardUnlockModal()" class="flex-1 bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold py-3 rounded-xl transition active:scale-95 text-sm">Batal</button>
+                <button onclick="submitDashboardUnlock()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-xl transition shadow-lg shadow-amber-500/20 active:scale-95 text-sm flex items-center justify-center gap-1.5">
+                    <i class="fas fa-unlock"></i> Buka Kunci
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM MODAL: EDIT DATA SISWA -->
+    <div id="edit-student-modal" class="fixed inset-0 z-[1050] hidden flex-col items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-transform duration-300 scale-95" id="edit-student-box">
+            <input type="hidden" id="edit-student-index">
+            <div class="w-16 h-16 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-blue-500/20">
+                <i class="fas fa-user-edit"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Edit Data Siswa</h3>
+            <p class="text-slate-400 mb-4 text-xs leading-relaxed">Perbarui informasi siswa dan masukkan kata sandi administrator.</p>
+            
+            <div class="space-y-3 mb-4 text-left">
+                <div>
+                    <label class="text-xs text-slate-400 font-bold uppercase mb-1 block">Nama Siswa</label>
+                    <input type="text" id="edit-student-name" class="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-700 focus:border-blue-500 outline-none text-sm font-semibold">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 font-bold uppercase mb-1 block">Kelas</label>
+                    <input type="text" id="edit-student-class" class="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-700 focus:border-blue-500 outline-none text-sm font-semibold">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 font-bold uppercase mb-1 block">Kata Sandi Admin</label>
+                    <div class="relative flex items-center">
+                        <input type="password" id="edit-student-password" class="w-full p-3 pr-10 rounded-xl bg-slate-800 text-white border border-slate-700 focus:border-blue-500 outline-none text-sm font-semibold tracking-wider" placeholder="••••••••">
+                        <button type="button" onclick="togglePasswordVisibility('edit-student-password', 'toggle-edit-eye-icon')" class="absolute right-3 text-slate-400 hover:text-white p-1" title="Lihat/Sembunyikan Sandi">
+                            <i id="toggle-edit-eye-icon" class="fas fa-eye text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 justify-center">
+                <button onclick="hideEditStudentModal()" class="flex-1 bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold py-3 rounded-xl transition active:scale-95 text-sm">Batal</button>
+                <button onclick="submitEditStudent()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-500/30 active:scale-95 text-sm">Perbarui</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM MODAL: HAPUS DATA SISWA -->
+    <div id="delete-student-modal" class="fixed inset-0 z-[1050] hidden flex-col items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-transform duration-300 scale-95" id="delete-student-box">
+            <input type="hidden" id="delete-student-index">
+            <div class="w-16 h-16 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-red-500/20">
+                <i class="fas fa-user-times"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Hapus Data Siswa</h3>
+            <p class="text-slate-400 mb-1 text-xs">Apakah Anda yakin ingin menghapus data siswa:</p>
+            <p id="delete-student-info" class="text-amber-400 font-bold text-sm mb-4"></p>
+            
+            <div class="mb-4 text-left">
+                <label class="text-xs text-slate-400 font-bold uppercase mb-1 block">Kata Sandi Admin</label>
+                <div class="relative flex items-center">
+                    <input type="password" id="delete-student-password" class="w-full p-3 pr-10 rounded-xl bg-slate-800 text-white border border-slate-700 focus:border-red-500 outline-none text-sm font-semibold tracking-wider" placeholder="••••••••">
+                    <button type="button" onclick="togglePasswordVisibility('delete-student-password', 'toggle-delete-eye-icon')" class="absolute right-3 text-slate-400 hover:text-white p-1" title="Lihat/Sembunyikan Sandi">
+                        <i id="toggle-delete-eye-icon" class="fas fa-eye text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex gap-3 justify-center">
+                <button onclick="hideDeleteStudentModal()" class="flex-1 bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold py-3 rounded-xl transition active:scale-95 text-sm">Batal</button>
+                <button onclick="submitDeleteStudent()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-red-500/30 active:scale-95 text-sm">Hapus</button>
+            </div>
+        </div>
+    </div>
+
     <!-- OVERLAY PERINGATAN (Anti-Cheat) -->
     <div id="warning-overlay" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center bg-red-600 text-white p-6 text-center">
         <i class="fas fa-exclamation-triangle text-7xl mb-4"></i>
@@ -615,6 +713,9 @@
                             <select id="filter-subject" class="p-2 text-sm border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-500" onchange="renderTeacherDashboard()">
                                 <option value="">Semua Mapel</option>
                             </select>
+                            <button onclick="openDashboardUnlockModal()" class="bg-amber-500 hover:bg-amber-600 text-slate-900 px-3 py-2 rounded-lg text-sm font-bold shadow-sm flex items-center gap-1.5 transition" title="Buka Kunci Siswa Berdasarkan Nama/Kelas">
+                                <i class="fas fa-unlock-alt"></i> Buka Kunci Siswa
+                            </button>
                             <button onclick="downloadMonitoringCSV()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-sm flex items-center gap-2 transition"><i class="fas fa-file-csv"></i> Download Laporan</button>
                             <button onclick="showResetPasswordModal()" class="text-xs text-red-500 hover:bg-red-50 px-2 py-2 rounded transition ml-1" title="Reset Semua Riwayat & Aktivitas"><i class="fas fa-trash"></i> Reset Semua</button>
                         </div>
@@ -623,14 +724,14 @@
                         <table class="w-full text-left text-sm whitespace-nowrap">
                             <thead class="bg-slate-100 text-slate-600">
                                 <tr>
-                                    <th class="p-4 font-semibold">ID</th>
-                                    <th class="p-4 font-semibold">Nama Siswa</th>
-                                    <th class="p-4 font-semibold">Mata Pelajaran</th>
-                                    <th class="p-4 font-semibold">Status</th>
-                                    <th class="p-4 font-semibold text-center">Pelanggaran</th>
-                                    <th class="p-4 font-semibold text-xs text-center max-w-[120px] whitespace-normal">Keterangan</th>
-                                    <th class="p-4 font-semibold">Aktivitas Terakhir</th>
-                                    <th class="p-4 font-semibold text-right">Aksi</th>
+                                    <th class="p-3.5 text-center font-semibold w-12">No</th>
+                                    <th class="p-3.5 font-semibold">Nama Siswa</th>
+                                    <th class="p-3.5 font-semibold">Kelas</th>
+                                    <th class="p-3.5 font-semibold">Mata Pelajaran</th>
+                                    <th class="p-3.5 text-center font-semibold">Status</th>
+                                    <th class="p-3.5 text-center font-semibold">Pelanggaran</th>
+                                    <th class="p-3.5 text-right font-semibold">Waktu Submit</th>
+                                    <th class="p-3.5 text-center font-semibold">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="student-table-body" class="divide-y divide-slate-100">
@@ -1266,22 +1367,22 @@
         function renderMonitoringTable() {
             const records = getRekapCompletedDB();
             const tbody = document.getElementById('student-table-body');
-            const registeredList = getRegisteredStudentsDB();
 
-            const countEl = document.getElementById('dash-completed');
-            const cleanEl = document.getElementById('dash-clean');
+            const countLoginEl = document.getElementById('dash-total-login');
+            const onlineEl = document.getElementById('dash-online');
+            const completedEl = document.getElementById('dash-completed');
             const violEl = document.getElementById('dash-violations');
-            const regCountEl = document.getElementById('dash-registered');
 
             // Hitung statistik
-            const totalCompleted = records.length;
-            const totalClean = records.filter(r => !r.violations || r.violations === 0).length;
-            const totalViolations = records.filter(r => r.violations && r.violations > 0).length;
+            const totalLogin = records.length;
+            const totalOnline = records.filter(r => r && r.status === 'Sedang Ujian').length;
+            const totalCompleted = records.filter(r => r && r.status && r.status.includes('Selesai')).length;
+            const totalViolations = records.reduce((acc, r) => acc + (parseInt(r.violations) || 0), 0);
 
-            if (countEl) countEl.innerText = totalCompleted;
-            if (cleanEl) cleanEl.innerText = totalClean;
+            if (countLoginEl) countLoginEl.innerText = totalLogin;
+            if (onlineEl) onlineEl.innerText = totalOnline;
+            if (completedEl) completedEl.innerText = totalCompleted;
             if (violEl) violEl.innerText = totalViolations;
-            if (regCountEl) regCountEl.innerText = registeredList.length;
 
             if (!tbody) return;
 
@@ -1301,32 +1402,182 @@
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">Belum ada data pengerjaan yang sesuai filter.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">Belum ada siswa yang login atau menyelesaikan ujian.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = filtered.map((r, idx) => {
-                const isTimeout = r.status && r.status.includes('Waktu Habis');
-                const badgeStatus = isTimeout 
-                    ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Selesai (Waktu Habis)</span>` 
-                    : `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Selesai</span>`;
+                let badgeStatus = '';
+                if (r.status === 'Sedang Ujian') {
+                    badgeStatus = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center gap-1 mx-auto w-max"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span> Sedang Ujian</span>`;
+                } else if (r.status && r.status.includes('Waktu Habis')) {
+                    badgeStatus = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Selesai (Waktu Habis)</span>`;
+                } else {
+                    badgeStatus = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Selesai</span>`;
+                }
 
                 const badgeViolations = (r.violations && r.violations > 0)
                     ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-600 border border-red-200"><i class="fas fa-exclamation-triangle text-[10px] mr-1"></i>${r.violations}x</span>`
                     : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">0</span>`;
 
+                const rawName = String(r.name || '-');
+                const rawClass = String(r.class || '-');
+                const encodedName = encodeURIComponent(rawName);
+                const encodedClass = encodeURIComponent(rawClass);
+
+                const timeDisplay = r.status === 'Sedang Ujian' 
+                    ? `<span class="text-indigo-600 font-semibold text-xs"><i class="fas fa-sign-in-alt text-[10px] mr-1"></i>${r.loginTime || r.submitTime || '-'}</span>`
+                    : `<span class="text-emerald-600 font-semibold text-xs"><i class="fas fa-check text-[10px] mr-1"></i>${r.submitTime || '-'}</span>`;
+
                 return `
                     <tr class="hover:bg-slate-50 transition border-b border-slate-100">
                         <td class="p-3.5 text-center text-slate-400 font-semibold">${idx + 1}</td>
-                        <td class="p-3.5 font-bold text-slate-800">${r.name || '-'}</td>
-                        <td class="p-3.5 font-semibold text-slate-600"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">${r.class || '-'}</span></td>
+                        <td class="p-3.5 font-bold text-slate-800">${rawName}</td>
+                        <td class="p-3.5 font-semibold text-slate-600"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">${rawClass}</span></td>
                         <td class="p-3.5 text-slate-700 font-medium">${r.subject || '-'}</td>
                         <td class="p-3.5 text-center">${badgeStatus}</td>
                         <td class="p-3.5 text-center">${badgeViolations}</td>
-                        <td class="p-3.5 text-right font-mono text-xs text-blue-600 font-semibold">${r.submitTime || '-'}</td>
+                        <td class="p-3.5 text-right font-mono">${timeDisplay}</td>
+                        <td class="p-3.5 text-center">
+                            <button type="button" data-name="${encodedName}" data-class="${encodedClass}" onclick="handleUnlockBtnClick(this)" class="bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 mx-auto" title="Buka Kunci & Izinkan Ujian Ulang">
+                                <i class="fas fa-unlock-alt text-[10px]"></i> Buka Kunci
+                            </button>
+                        </td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        // ==========================================
+        // --- KONTROL BUKA KUNCI DARI DASBOR PENGAWAS ---
+        // ==========================================
+        function handleUnlockBtnClick(btn) {
+            if (!btn) return;
+            try {
+                const studentName = decodeURIComponent(btn.getAttribute('data-name') || '');
+                const studentClass = decodeURIComponent(btn.getAttribute('data-class') || '');
+                unlockStudentFromTable(studentName, studentClass);
+            } catch (err) {
+                console.error("Gagal mendecode data siswa untuk buka kunci:", err);
+            }
+        }
+
+        function unlockStudentFromTable(studentName, studentClass) {
+            showCustomConfirm(
+                "Buka Kunci Siswa",
+                `Buka kunci dan izinkan siswa:\n"${studentName} (${studentClass})"\nuntuk dapat mengerjakan ujian kembali?`,
+                () => {
+                    executeUnlockStudent(studentName, studentClass);
+                }
+            );
+        }
+
+        function executeUnlockStudent(studentName, studentClass) {
+            const studentKey = `${studentName}_${studentClass || ''}`.toLowerCase().trim();
+
+            // 1. Bersihkan riwayat selesai lokal
+            const completedDB = getCompletedExamsDB();
+            if (completedDB[studentKey]) {
+                delete completedDB[studentKey];
+                localStorage.setItem(COMPLETED_EXAMS_DB_KEY, JSON.stringify(completedDB));
+            }
+
+            // 2. Bersihkan rekapan pengerjaan jika ada
+            let rekapList = getRekapCompletedDB();
+            const originalLength = rekapList.length;
+            rekapList = rekapList.filter(r => !(r.name && r.name.toLowerCase() === studentName.toLowerCase() && String(r.class || '').toLowerCase() === String(studentClass || '').toLowerCase()));
+            if (rekapList.length !== originalLength) {
+                saveRekapCompletedDB(rekapList);
+                enqueueSync(['rekapCompleted'], { action: 'setDatabase', data: { rekapCompleted: rekapList } });
+            }
+
+            // 3. Reset sesi aktif lokal
+            const db = getDB();
+            for (let id in db) {
+                if (db[id].name.toLowerCase() === studentName.toLowerCase() && String(db[id].class || '').toLowerCase() === String(studentClass || '').toLowerCase()) {
+                    delete db[id];
+                }
+            }
+            saveDB(db);
+
+            renderTeacherDashboard();
+            showCustomAlert("Berhasil Dibuka", `Akses ujian untuk siswa "${studentName} (${studentClass})" berhasil dibuka kembali. Siswa dapat login dan mengerjakan soal kembali.`, "success");
+        }
+
+        function openDashboardUnlockModal() {
+            const modal = document.getElementById('dashboard-unlock-modal');
+            const box = document.getElementById('dashboard-unlock-box');
+            if (!modal || !box) return;
+
+            // Isi daftar kelas
+            const classSelect = document.getElementById('dash-unlock-class');
+            const nameSelect = document.getElementById('dash-unlock-name');
+            const db = getRegisteredStudentsDB();
+
+            const classes = [...new Set(db.map(s => s.class).filter(Boolean))].sort();
+            classSelect.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+            classes.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                classSelect.appendChild(opt);
+            });
+
+            nameSelect.innerHTML = '<option value="">-- Pilih Nama Siswa --</option>';
+            nameSelect.disabled = true;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            box.classList.remove('scale-95');
+            box.classList.add('scale-100');
+        }
+
+        function populateDashboardUnlockNames() {
+            const cls = document.getElementById('dash-unlock-class').value;
+            const nameSelect = document.getElementById('dash-unlock-name');
+            const db = getRegisteredStudentsDB();
+
+            nameSelect.innerHTML = '<option value="">-- Pilih Nama Siswa --</option>';
+            if (cls) {
+                nameSelect.disabled = false;
+                const students = db.filter(s => s && s.class === cls).sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+                students.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.textContent = s.name;
+                    nameSelect.appendChild(opt);
+                });
+            } else {
+                nameSelect.disabled = true;
+            }
+        }
+
+        function hideDashboardUnlockModal() {
+            const modal = document.getElementById('dashboard-unlock-modal');
+            const box = document.getElementById('dashboard-unlock-box');
+            if (!modal || !box) return;
+            modal.classList.add('opacity-0');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        function submitDashboardUnlock() {
+            const cls = document.getElementById('dash-unlock-class').value;
+            const name = document.getElementById('dash-unlock-name').value;
+
+            if (!cls || !name) {
+                showCustomAlert("Perhatian", "Silakan pilih Kelas dan Nama Siswa terlebih dahulu.", "error");
+                return;
+            }
+
+            hideDashboardUnlockModal();
+            executeUnlockStudent(name, cls);
         }
 
         function downloadMonitoringCSV() {
@@ -1624,8 +1875,10 @@
                 showCustomConfirm("Reset Semua Data", "Hapus semua data aktivitas dan RIWAYAT ujian siswa? (Ini akan mengizinkan SEMUA siswa mengerjakan ulang)", () => {
                     localStorage.removeItem(DB_KEY);
                     localStorage.removeItem(COMPLETED_EXAMS_DB_KEY);
-                    syncToBackend(['students', 'completedExams']);
+                    localStorage.removeItem(REKAP_COMPLETED_KEY);
+                    syncToBackend(['students', 'completedExams', 'rekapCompleted']);
                     renderTeacherDashboard();
+                    renderCompletedRecordsTable();
                     showCustomAlert("Berhasil", "Semua data aktivitas dan riwayat ujian berhasil direset.", "success");
                 });
             } else {
@@ -2622,35 +2875,19 @@
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFFNo,Nama Siswa,Kelas,Mata Pelajaran,Pelanggaran,Status,Waktu Submit\n";
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFFNo,Nama Siswa,Kelas,Mata Pelajaran,Status,Pelanggaran,Waktu Masuk / Selesai\n";
             records.forEach((r, i) => {
-                csvContent += `${i + 1},"${r.name || '-'}","${r.class || '-'}","${r.subject || '-'}","${r.violations || 0}","${r.status || 'Selesai'}","${r.submitTime || '-'}"\n`;
+                const timeInfo = r.status === 'Sedang Ujian' ? (r.loginTime || r.submitTime || '-') : (r.submitTime || '-');
+                csvContent += `${i + 1},"${r.name || '-'}","${r.class || '-'}","${r.subject || '-'}","${r.status || '-'}","${r.violations || 0}","${timeInfo}"\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Rekap_Ujian_SPECTRA_${new Date().toISOString().slice(0,10)}.csv`);
+            link.setAttribute("download", `Monitoring_Siswa_SPECTRA_${new Date().toISOString().slice(0,10)}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
-
-        function submitResetPassword() {
-            const passwordInput = document.getElementById('reset-password-input');
-            if (passwordInput.value.trim() === 'admin421') {
-                hideResetPasswordModal();
-                showCustomConfirm("Reset Rekapitulasi", "Kosongkan seluruh data rekapan siswa yang telah selesai ujian?", () => {
-                    localStorage.removeItem(REKAP_COMPLETED_KEY);
-                    localStorage.removeItem(COMPLETED_EXAMS_DB_KEY);
-                    renderCompletedRecordsTable();
-                    enqueueSync(['rekapCompleted'], { action: 'setDatabase', data: { rekapCompleted: [] } });
-                    showCustomAlert("Berhasil", "Data rekapan hasil ujian berhasil dikosongkan.", "success");
-                });
-            } else {
-                hideResetPasswordModal();
-                showCustomAlert("Akses Ditolak", "Kata sandi administrator salah. Gagal melakukan reset.", "error");
-            }
         }
 
         function updateQRBadge(isActive) {
@@ -2830,80 +3067,109 @@
         }
 
         function loadLoginClasses() {
-            const db = getRegisteredStudentsDB();
             const classSelect = document.getElementById('student-class');
-            const classes = [...new Set(db.filter(s => {
-                if (!s || !s.class) return false;
-                const clsUpper = s.class.toUpperCase().trim();
-                if (selectedGrade === 7) return clsUpper.startsWith("7") || clsUpper.startsWith("VII");
-                if (selectedGrade === 8) return clsUpper.startsWith("8") || clsUpper.startsWith("VIII");
-                if (selectedGrade === 9) return clsUpper.startsWith("9") || clsUpper.startsWith("IX");
-                return true;
-            }).map(s => s.class))].sort();
-            
+            const nameSelect = document.getElementById('student-name');
+            if (!classSelect) return;
+            const db = getRegisteredStudentsDB();
+
+            let classes = [...new Set(db.map(s => s && s.class).filter(Boolean))];
+            if (selectedGrade) {
+                const gradeStr = String(selectedGrade).trim();
+                classes = classes.filter(c => String(c).trim().startsWith(gradeStr) || String(c).includes(gradeStr));
+            }
+            classes.sort();
+
             classSelect.innerHTML = '<option value="">-- Pilih Kelas --</option>';
             classes.forEach(c => {
                 const opt = document.createElement('option');
-                opt.value = c; opt.textContent = c; classSelect.appendChild(opt);
+                opt.value = c;
+                opt.textContent = c;
+                classSelect.appendChild(opt);
             });
-            const nameSelect = document.getElementById('student-name');
-            nameSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
-            nameSelect.disabled = true;
+
+            if (nameSelect) {
+                nameSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
+                nameSelect.disabled = true;
+            }
         }
 
         function populateLoginNames() {
-            const cls = document.getElementById('student-class').value;
+            const cls = document.getElementById('student-class')?.value;
             const nameSelect = document.getElementById('student-name');
+            if (!nameSelect) return;
             const db = getRegisteredStudentsDB();
+
             nameSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
-            if(cls) {
+            if (cls) {
                 nameSelect.disabled = false;
                 const students = db.filter(s => s && s.class === cls).sort((a,b) => (a.name || "").localeCompare(b.name || ""));
                 students.forEach(s => {
                     const opt = document.createElement('option');
-                    opt.value = s.name; opt.textContent = s.name; nameSelect.appendChild(opt);
+                    opt.value = s.name;
+                    opt.textContent = s.name;
+                    nameSelect.appendChild(opt);
                 });
-            } else { nameSelect.disabled = true; }
+            } else {
+                nameSelect.disabled = true;
+            }
         }
 
         function populateSubjectFilter() {
-            const filterSelect = document.getElementById('filter-subject');
-            if(!filterSelect) return;
-            const currentVal = filterSelect.value;
-            filterSelect.innerHTML = '<option value="">Semua Mapel</option>';
+            const filterEl = document.getElementById('filter-subject');
+            if (!filterEl) return;
             const db = getSubjectsDB();
-            let uniqueSubjects = [...new Set(Object.values(db).map(d => d.subjectName).filter(Boolean))].sort();
-            uniqueSubjects.forEach(subj => {
+            const subjects = [...new Set(Object.values(db).map(s => s && (s.subjectName || s.name)).filter(Boolean))].sort();
+
+            filterEl.innerHTML = '<option value="">Semua Mapel</option>';
+            subjects.forEach(sub => {
                 const opt = document.createElement('option');
-                opt.value = subj; opt.textContent = subj; filterSelect.appendChild(opt);
+                opt.value = sub;
+                opt.textContent = sub;
+                filterEl.appendChild(opt);
             });
-            filterSelect.value = currentVal;
         }
 
-        window.onload = () => {
-            if (!navigator.onLine) {
-                document.getElementById('offline-overlay').className = "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-sm text-white p-6 text-center";
-            }
+        function showBlockedWithUnlockOption(message, examUrl, subjectName) {
+            showCustomAlert("Akses Ditolak", message + "\n\nSilakan hubungi pengawas untuk membuka kunci pengerjaan Anda.", "error");
+        }
+
+        function downloadTemplateCSV() {
+            const csvContent = "data:text/csv;charset=utf-8,Nama Siswa,Kelas\nBudi Santoso,7A\nSiti Rahma,7B\n";
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "template_data_siswa.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ==========================================
+        // 6. INITIALIZATION & LIFECYCLE HOOKS
+        // ==========================================
+        window.onload = function() {
+            setInterval(updateWibClock, 1000);
+            updateWibClock();
+            fetchFromBackend();
+            processSyncQueue();
+
             window.addEventListener('online', () => {
-                document.getElementById('offline-overlay').className = "fixed inset-0 z-[9999] hidden flex-col items-center justify-center bg-slate-900/95 backdrop-blur-sm text-white p-6 text-center";
-                fetchFromBackend();
-                processSyncQueue(); // Langsung proses antrean yang tertunda saat koneksi kembali
-            });
-            window.addEventListener('offline', () => {
-                document.getElementById('offline-overlay').className = "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-sm text-white p-6 text-center";
+                const offEl = document.getElementById('offline-overlay');
+                if (offEl) {
+                    offEl.classList.add('hidden');
+                    offEl.classList.remove('flex');
+                }
+                processSyncQueue();
             });
 
-            // Ambil data awal sekali saja saat aplikasi dimuat
-            fetchFromBackend();
-            processSyncQueue(); // Cek jika ada sisa data pengerjaan sebelumnya yang belum terkirim
-            switchView('view-role');
-            
-            // Jalankan jam WIB real-time
-            updateWibClock();
-            setInterval(updateWibClock, 1000);
-            
-            // Pembersihan: Siswa TIDAK lagi membombardir server setiap 5 detik!
-            // Polling hanya berjalan otomatis jika Pengawas membuka dasbor monitoring.
+            window.addEventListener('offline', () => {
+                const offEl = document.getElementById('offline-overlay');
+                if (offEl) {
+                    offEl.classList.remove('hidden');
+                    offEl.classList.add('flex');
+                }
+                updateCloudUIStatus('error');
+            });
         };
     </script>
 </body>
